@@ -1,96 +1,31 @@
 # Template Contract
 
-## 1. Source of truth
+## Source of truth
 
-A Word `.docx` / `.dotx` template is the authoritative format source whenever one is supplied.
+A supplied `.docx`/`.dotx` is the authoritative visual-format source. Preserve styles, numbering, settings, theme/font table, section properties, headers/footers, page numbering, TOC/caption fields/styles, table styles, custom style names/relationships, and pagination controls whenever present.
 
-Do not duplicate its visual rules into separate Markdown files unless the rule cannot be represented or reliably inferred from Word.
+Do not duplicate visual rules into Markdown/YAML when Word already represents them.
 
-## 2. What to preserve from a template
-
-Preserve whenever present:
-
-- `word/styles.xml`
-- `word/numbering.xml`
-- `word/settings.xml`
-- `word/theme/*`
-- `word/fontTable.xml`
-- section properties (`sectPr`)
-- headers and footers
-- page-number configuration
-- TOC fields and TOC styles
-- caption styles and sequence fields
-- table styles
-- custom style names and based-on relationships
-- keep-with-next / keep-together / widow-control / page-break-before behavior
-
-Prefer modifying content around those structures rather than reconstructing them.
-
-## 3. How to add a reusable format
-
-Recommended directory:
+## Reusable format
 
 ```text
 templates/<template-name>/
 ├── template.docx
-└── profile.yaml        # optional
+└── profile.yaml        # optional, small, semantic
 ```
 
-`template.docx` should contain the real Word styles and native structures.
+Good profile values include semantic style mappings, section-title aliases, heading depth/new-page behavior, caption labels/chapter level/separator, TOC depth, bibliography numbering grammar (`[%1]`, TAB suffix), and other rules that cannot be inferred reliably.
 
-`profile.yaml` should be small. It exists only to declare semantic mappings or rules that are ambiguous from the template itself.
+Font names/sizes, margins, line/paragraph spacing, ordinary indentation, bold/italic, and border details normally belong in `template.docx`, not YAML.
 
-## 4. What belongs in profile.yaml
+## Content + template
 
-Good profile values:
+Content comes from the content document; formatting semantics come from the target template/profile; explicit user instructions override both. Map source semantics to target styles rather than copying source direct formatting.
 
-- semantic mapping of custom style names;
-- which heading level starts a new page;
-- whether figure/table numbering includes chapter number;
-- caption labels (`图`, `表`, `式`, `Figure`, `Table`);
-- numbering separator (`-`, `.`, etc.);
-- TOC depth;
-- whether references/acknowledgements/appendices start on new pages;
-- body-list styles when template names are ambiguous;
-- special section names that should map to heading levels or TOC entries.
+## Template examples
 
-Avoid copying these into YAML unless they truly need to override the template:
+Sample text demonstrates formatting unless explicitly marked fixed. Repeated native structure is stronger evidence than one-off direct formatting.
 
-- font name;
-- font size;
-- margins;
-- line spacing;
-- paragraph spacing;
-- direct indentation;
-- bold/italic;
-- table border details.
+## Safe section transfer
 
-Those should normally remain inside the Word template.
-
-## 5. Ad-hoc templates
-
-A user-supplied template does not need to be copied into the skill folder.
-
-The skill may inspect and use the uploaded template directly for that task.
-
-If the user later wants it reusable, save it under `templates/<name>/template.docx` and optionally add a minimal profile.
-
-## 6. Existing content document + template
-
-When both exist:
-
-- content comes from the content document;
-- formatting system comes from the template;
-- user instructions override both.
-
-Do not blindly copy source paragraph formatting into the target template.
-
-Map source semantics to target styles instead.
-
-## 7. Template examples versus rules
-
-Sample text inside a template may exist only to demonstrate formatting.
-
-Do not treat sample wording as required content unless the user or template explicitly marks it as fixed wording.
-
-Repeated structural behavior is stronger evidence than one-off direct formatting.
+Page geometry/page-number settings may be transferred from corresponding template sections. Do not blindly copy header/footer relationship ids between packages; relationships must be cloned correctly or the template itself should be used as the base document.

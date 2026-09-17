@@ -1,6 +1,6 @@
 ---
 name: document-format-writer
-description: Template-driven Word formatter for formal documents. Use when the user wants to create, rewrite, or reformat a .docx according to a Word template or explicit formatting requirements. The final document must preserve or create native Word structures such as heading styles, multilevel numbering, page-break-before, captions, fields, TOC, page numbers, and cross-references instead of visually imitating them with plain text.
+description: Template-driven Word formatter for formal documents. Use when the user wants to create, rewrite, or reformat a .docx according to a Word template or explicit formatting requirements. The final document must preserve or create native Word structures such as heading styles, multilevel numbering, page-break-before, captions, bibliography numbering, fields, TOC, page numbers, and cross-references instead of visually imitating them with plain text.
 ---
 
 # Document Format Writer
@@ -9,41 +9,28 @@ description: Template-driven Word formatter for formal documents. Use when the u
 
 The Word template is the primary source of truth for formatting.
 
-If the user does not supply a template, use `templates/generic-formal/template.docx` together with `templates/generic-formal/profile.yaml` as the default common formal-document baseline. This default template implements the existing common requirements: formal long-document structure, true multilevel heading numbering, chapter page-break-before, native figure/table captions, TOC/page-number fields, and the established paragraph/caption/reference/appendix rules.
+If the user does not supply a template, use `templates/generic-formal/template.docx` together with `templates/generic-formal/profile.yaml` as the default common formal-document baseline.
 
-Do not maintain a separate institution-specific Markdown rule file when the same rule already exists in the template. Markdown references in this skill only define how to interpret, preserve, implement, and validate Word structures.
+Do not maintain a separate institution-specific Markdown rule file when the same rule already exists in the template. Markdown references define how to interpret, preserve, implement, and validate Word structures.
 
-A document is compliant only when both of these are true:
+A document is compliant only when it both looks correct and has correct Word-native structure. Visual imitation alone is not acceptable for numbering, captions, bibliography numbering, TOC, page numbers, page-break-before, lists, or cross-references.
 
-1. it looks correct;
-2. its Word-native structure is correct.
+## Inputs and priority
 
-Visual imitation alone is not acceptable for numbering, captions, TOC, page numbers, page-break-before, lists, or cross-references.
-
-## Inputs
-
-The user may provide any combination of:
-
-- a content `.docx` to be reformatted;
-- a format template `.docx` or `.dotx`;
-- plain text / Markdown content to be turned into a `.docx`;
-- an optional template profile YAML containing only semantic mappings or overrides that cannot be inferred reliably from the template;
-- explicit user instructions that override the template.
-
-## Priority
+The user may provide a content `.docx`, a format `.docx`/`.dotx`, plain text/Markdown, a small semantic profile YAML, and explicit instructions.
 
 Apply rules in this order:
 
 1. explicit user instruction;
-2. current user-supplied template and its paired profile;
-3. `templates/generic-formal/template.docx` and its profile when no user template is supplied;
+2. current user-supplied template and paired profile;
+3. bundled `generic-formal` template/profile when no user template is supplied;
 4. safe fallback behavior in this skill.
 
-If a template and profile conflict, prefer explicit profile values only for fields the profile intentionally overrides. Do not use a profile to duplicate all visual formatting already present in the template.
+The profile is semantic configuration, not a duplicate visual style sheet. Font, size, spacing, margins, borders, and most indentation belong in the Word template unless an explicit override is truly necessary.
 
 ## Required references
 
-Read these files when performing document work:
+Read:
 
 - `references/template-contract.md`
 - `references/word-native-structures.md`
@@ -51,160 +38,113 @@ Read these files when performing document work:
 
 ## Fast default path
 
-For ordinary requests that say “通用模板格式化” and do not provide an institution-specific template, start with the bundled deterministic formatter instead of writing a document-specific script:
+For ordinary “通用模板格式化” requests, use the deterministic formatter first:
 
 ```powershell
-python scripts/fast_format_docx.py --source <input.docx> --output <output.docx> --ensure-toc --strict-cross-references
-python scripts/validate_docx.py <output.docx> --require-toc --require-captions --require-multilevel --require-crossrefs
+python scripts/fast_format_docx.py --source <input.docx> --output <output.docx> --profile templates/generic-formal/profile.yaml --ensure-toc --strict-cross-references
+python scripts/validate_docx.py <output.docx> --profile templates/generic-formal/profile.yaml --require-toc --require-captions --require-multilevel --require-crossrefs --require-reference-numbering
 ```
 
-The formatter preserves the source file, imports the generic template's native styles/numbering/settings, maps common heading/list/caption/reference/equation semantics, converts typed figure/table/equation/reference numbers to native fields, creates stable bookmarks, replaces resolvable body citations with clickable `REF` fields, adds a PAGE field when missing, and marks fields for refresh on open. `scripts/repair_cross_references.py` is the reusable second stage when only cross-reference repair is needed.
+The formatter imports template-native styles/numbering/settings, maps document semantics through the active profile, applies safe section geometry from the template, converts typed figure/table captions to native `SEQ` fields, normalizes bibliography entries to a native `[1]`/`[2]` numbered list with TAB suffix, builds bookmarks, converts body citations to native clickable `REF` fields, adds PAGE/TOC fields when required, and marks fields for refresh on open.
 
-If Microsoft Word is used to refresh fields, immediately run `scripts/restore_template_parts.py <docx> <docx>` before final validation. Word may rewrite heading-numbering bindings and caption-label registrations while saving; this restoration preserves refreshed cached field results while reinstating the template-native definitions.
+Use `scripts/repair_cross_references.py` when only bibliography/cross-reference repair is needed.
 
-Use its JSON summary as the first routing decision. Escalate to custom document-specific code only when validation reports a real FAIL, `fallback_styles` is nonzero, important semantics were not detected, the user supplied a special template, or visual QA shows an actual defect. Do not escalate solely for cached field text or validator warnings inside a valid TOC.
+If Microsoft Word refreshes fields and rewrites template-native definitions, run `scripts/restore_template_parts.py <docx> <docx> --template <template.docx>` before final validation.
 
-For visual QA, render once, build a contact sheet with `scripts/make_contact_sheet.py`, inspect every page on the sheet, and open only suspicious pages at full size. This satisfies full-page coverage without one tool call per page.
+For visual QA, render once, build a contact sheet, inspect every page on the sheet, and open only suspicious pages at full size.
+
+## Bibliography contract
+
+Bibliography handling is structural, not cosmetic.
+
+When the active profile requires numeric references:
+
+- bibliography entries must use one native Word numbered-list definition;
+- list text must be `[1]`, `[2]`, `[3]`... via numbering, never typed into entry text;
+- the numbering level must use a TAB suffix so the entry body begins after a real tab stop;
+- bibliography paragraphs must use the profile's reference style;
+- manually typed prefixes such as `[1]`, `1.`, `1、` must be removed once native numbering is installed;
+- every bibliography entry must have a stable bookmark target;
+- body citations such as `[1]` must use native `REF` fields to the bibliography bookmark with the paragraph-number switch (`\\n`) and hyperlink switch (`\\h`), so renumbering/reordering references updates citations after field refresh;
+- a `REF` field that returns bibliography paragraph text instead of the paragraph number is invalid;
+- do not use a separate manually maintained `SEQ` counter for bibliography numbers when the bibliography itself is a native numbered list.
 
 ## Template-driven workflow
 
-### A0. When no template is supplied
+### No supplied template
 
-1. Use the fast default path above first. Start from `templates/generic-formal/template.docx` only when the fast formatter must be extended or bypassed.
-2. Read `templates/generic-formal/profile.yaml` for semantic rules that are not fully represented by Word styles/fields.
-3. Preserve its native multilevel heading numbering, page-break-before behavior, TOC/PAGE fields, caption fields, section/page-number configuration, and reusable paragraph styles.
-4. Replace the placeholder/sample content with the user's content rather than recreating the formatting manually.
+1. Use `templates/generic-formal/template.docx` and its profile.
+2. Preserve native multilevel headings, page-break-before, captions, bibliography numbering, TOC/PAGE fields, section/page-number configuration, and reusable semantic styles.
+3. Replace sample content rather than recreating the formatting manually.
 
-### A. When a template is supplied
+### Supplied template
 
-1. Inspect the template before drafting or reformatting.
-2. Treat the template itself as the base document whenever practical.
-3. Preserve its existing:
-   - styles;
-   - numbering definitions;
-   - heading-to-numbering bindings;
-   - section properties;
-   - headers and footers;
-   - page numbering;
-   - caption styles and fields;
-   - TOC fields and TOC styles;
-   - table styles;
-   - theme/font bindings;
-   - custom XML or settings required by Word.
-4. Identify semantic styles by structure and sample usage rather than by visible appearance alone.
-5. Replace or insert content without flattening the template into direct formatting.
-6. Reuse existing native structures before creating new ones.
+1. Inspect the template first with `scripts/inspect_docx.py`.
+2. Treat the template itself as the base formatting source whenever practical.
+3. Preserve styles, numbering definitions, heading bindings, section properties, headers/footers, page numbering, caption definitions/fields, TOC fields/styles, table styles, theme/font bindings, and required settings/custom XML.
+4. Load the supplied profile when present. Do not hard-code `Heading 1`, `Figure Caption`, `图`, `表`, or other generic-template names in the formatting engine.
+5. Reuse existing native structures before creating new ones.
+6. If the template uses custom style names, map semantic roles through the profile or structural inspection.
 
-### B. When formatting an existing content document
+### Existing content document
 
-1. Preserve user content unless rewriting is requested.
-2. Map content paragraphs to template semantic styles:
-   - title/front matter;
-   - Heading 1-N;
-   - body text;
-   - lists;
-   - figure captions;
-   - table captions;
-   - notes/sources;
-   - references;
-   - appendices.
-3. Remove manually typed numbering only when it is being replaced by genuine Word numbering.
-4. Convert visual-only constructs to native Word structures when required.
-5. Do not copy all direct formatting from the source document into the template.
+Preserve content unless rewriting is requested. Map paragraphs to semantic roles such as title/front matter, Heading 1-N, body, body lists, figure/table captions, notes, references, acknowledgements, and appendices. Remove manual numbering only when replacing it with a genuine Word-native mechanism.
 
-### C. When creating a document from plain text or Markdown
+Section state must be explicit. Entering `参考文献` must not cause following `致谢` or appendix body paragraphs to remain reference paragraphs.
 
-1. Determine semantic structure first.
-2. Insert content into the template using the template's styles.
-3. Apply native heading numbering and list structures.
-4. Insert figures/tables with native captions when required.
-5. Use Word fields for TOC, page numbers, caption sequences, and cross-references when applicable.
+### Plain text / Markdown
+
+Determine semantic structure first, then insert content using template styles and native numbering/field structures.
 
 ## New-format workflow
 
-The built-in default format lives at:
+A reusable format is normally:
 
-`templates/generic-formal/template.docx`
+```text
+templates/<template-name>/
+├── template.docx
+└── profile.yaml    # optional and small
+```
 
-A new format should normally be added as:
+The profile stores semantic mappings/ambiguities such as custom style names, section-title aliases, caption labels, TOC depth, bibliography numbering semantics, and section behavior that cannot be reliably inferred from the Word file.
 
-`templates/<template-name>/template.docx`
-
-Optionally add:
-
-`templates/<template-name>/profile.yaml`
-
-The profile is only for semantic mappings and explicit overrides that cannot be reliably inferred from the Word file.
-
-Do NOT create another long Markdown file that restates font sizes, spacing, margins, and numbering already encoded in the Word template.
-
-The user may also upload a template ad hoc. It does not need to be installed permanently into this folder for the skill to use it.
-
-## Semantic mapping
-
-When a template contains custom style names, determine which styles correspond to semantic roles such as:
-
-- document title;
-- abstract title/body;
-- Heading 1 / Heading 2 / Heading 3 / Heading 4;
-- body text;
-- figure caption;
-- table caption;
-- figure/table note;
-- TOC 1 / TOC 2 / TOC 3;
-- references;
-- acknowledgements;
-- appendix heading/body.
-
-Prefer existing template styles even when their names are not standard English Word names.
+Do not create another long Markdown file that restates visual formatting already encoded in the template.
 
 ## Native Word requirements
 
-Follow `references/word-native-structures.md`.
-
 At minimum:
 
-- heading hierarchy must use actual heading styles or template-equivalent outline styles;
-- numbered headings must use a real multilevel numbering definition;
-- chapter-start behavior should use `pageBreakBefore` when appropriate;
-- body lists must use Word list/numbering structures;
-- figure/table captions must use caption styles and `SEQ`-based fields or equivalent native fields;
-- TOC must use a Word TOC field;
-- page numbers must use Word PAGE fields;
-- cross-references should use REF/PAGEREF or equivalent native fields when required;
-- section breaks should be used only for true section-level changes.
+- headings use real outline styles;
+- numbered headings use a real multilevel list;
+- chapter starts use `pageBreakBefore` when required;
+- ordinary lists use Word list definitions;
+- figure/table captions use native `SEQ` fields;
+- bibliography numbering uses native numbered-list structure when the profile requires numeric references;
+- bibliography citations use `REF` fields to list-number bookmarks;
+- TOC uses a Word TOC field;
+- page numbers use PAGE fields;
+- other cross-references use REF/PAGEREF or equivalent fields;
+- section breaks are used only for true section-level changes.
 
 ## No silent degradation
 
-Never silently replace a requested native feature with a visual imitation.
-
-Examples of unacceptable degradation:
-
-- multilevel heading numbering -> typed text such as `1.2.3`;
-- figure caption field -> typed `图1-1`;
-- table caption field -> typed `表2-3`;
-- TOC field -> manually typed TOC;
-- page number field -> typed number;
-- page-break-before -> empty paragraphs;
-- body list -> typed bullets/numbers when an editable Word list is required.
-
-If the runtime cannot implement a required native feature correctly, report that limitation instead of pretending the document is fully compliant.
+Never silently replace a requested native feature with a visual imitation, including typed heading numbers, typed figure/table numbers, manually typed bibliography `[1]`, manually typed TOC/page numbers, blank paragraphs for chapter pagination, or copied citation numbers that do not update.
 
 ## Validation gate
 
-Before final delivery, run structural validation according to `references/validation.md`.
+Before delivery run structural validation. The validator must be profile-driven rather than assuming English Word style names or Chinese caption labels.
 
-If scripts are available, use:
+For numeric bibliography formats, validation must confirm:
 
-- `scripts/inspect_docx.py` to inspect a template or generated document;
-- `scripts/validate_docx.py` to validate required Word-native structures.
+- the reference style is bound to a native list;
+- its level text matches the profile (generic default: `[%1]`);
+- its suffix is a real TAB;
+- reference entry text contains no manually typed numeric prefix;
+- body bibliography REF fields use the paragraph-number switch;
+- every REF target bookmark exists.
 
-A final document must not be treated as compliant only because its rendered appearance looks correct.
+A final document is not compliant merely because it renders correctly.
 
 ## Output
 
-Default final artifact: `.docx`.
-
-Do not use Markdown as the final deliverable unless the user explicitly asks for Markdown.
-
-When the user asks only for a reusable template system or skill configuration, provide the skill/template files rather than generating a content document.
+Default final artifact: `.docx`. Markdown is not the final deliverable unless explicitly requested.

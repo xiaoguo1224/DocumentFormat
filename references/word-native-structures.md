@@ -2,159 +2,55 @@
 
 ## Principle
 
-If Microsoft Word has a native semantic mechanism for a feature, use that mechanism rather than plain text that only looks equivalent.
+If Microsoft Word has a native semantic mechanism for a feature, use that mechanism rather than plain text that only looks equivalent. Template-native structure wins; the active profile supplies only semantic mappings/overrides that cannot be inferred reliably.
 
-## 1. Headings
+## Headings and pagination
 
-A heading must use a real heading/outline style.
+A heading must use a real heading/outline style. Numbered headings use one multilevel numbering definition bound to heading levels; numbers are not typed into paragraph text. Lower levels restart through the numbering definition.
 
-For numbered headings, use one multilevel numbering definition bound to heading levels.
+When a chapter must start on a new page, prefer `pageBreakBefore`, with `keepWithNext`/`keepTogether` where appropriate. Use section breaks only for real section-level changes such as page-number restart, header/footer change, orientation, margins, or columns.
 
-Typical hierarchy:
+## Body lists
 
-- level 1 -> `1`
-- level 2 -> `1.1`
-- level 3 -> `1.1.1`
-- level 4 -> `1.1.1.1`
+Ordinary numbered/bulleted lists are separate from heading numbering. Use native list definitions; do not reuse heading numbering unless the template intentionally does so.
 
-Do not type the number into the paragraph text.
+## Figure/table captions
 
-Subordinate levels must restart according to the multilevel numbering definition when a parent level changes.
+Captions use dedicated semantic styles plus `SEQ` fields. Chapter-aware numbering uses the template/profile's heading level and separator. Figure and table counters are independent. When Insert Caption compatibility is required, register labels in `word/settings.xml` (`w:captions`).
 
-Prefer the template's existing `numbering.xml` definitions.
+## Bibliography and citations
 
-## 2. Heading pagination
+For a numeric bibliography profile:
 
-When a chapter or other heading must start on a new page, prefer paragraph property `pageBreakBefore`.
+- bibliography entries use one native Word numbered-list definition;
+- the level text is profile-driven (generic default: `[%1]`);
+- the list suffix is a real TAB (`w:suff w:val="tab"`), with an actual numbering tab stop;
+- bibliography entry text must not contain a typed `[1]`, `1.`, `1、`, etc. once native numbering is installed;
+- each bibliography entry gets a stable ASCII bookmark;
+- body citations use `REF <bookmark> \\n \\h` (paragraph-number + hyperlink switches) so they retrieve the numbered-list value, not the bibliography paragraph text;
+- do not maintain a separate SEQ counter for bibliography numbers when native list numbering is the source of truth.
 
-Also preserve or set `keepWithNext` and `keepTogether` where appropriate.
+A plain `REF <bookmark>` to a whole bibliography paragraph is not sufficient because it can resolve to paragraph text rather than the paragraph number.
 
-Do not create chapter starts with blank paragraphs.
+## Formulas
 
-Use a section break only when section-level behavior changes, such as:
+Prefer editable OMML equations. Preserve or create native numbering fields when the template requires numbered formulas. Do not rasterize equations merely to preserve appearance.
 
-- page-number restart;
-- header/footer change;
-- orientation change;
-- margin change;
-- columns or other section properties.
+## Other cross-references
 
-## 3. Body lists
+Use `REF`, `PAGEREF`, or equivalent native fields. Targets must have stable bookmarks. Existing complex paragraphs containing fields, drawings, comments, footnotes/endnotes, content controls, bookmarks, tabs/breaks, or mixed run formatting should not be destructively rebuilt just to create a cross-reference; report/skip ambiguous cases instead.
 
-Ordinary numbered/bulleted lists are separate from heading numbering.
+## TOC and page numbers
 
-They should use Word numbering/list definitions rather than manually typed prefixes when editable lists are required.
+Use a real `TOC` field driven by real heading styles. Page numbers use `PAGE` (and related) fields and preserve section-specific numbering formats/restarts.
 
-Do not reuse heading numbering definitions for body lists unless the template intentionally does so.
+## Styles and fields
 
-## 4. Figure captions
+Use reusable styles for repeated semantics. A `.docx` can contain field instructions and cached visible values; keep the field even when the runtime cannot force Word to recalculate it. Mark fields dirty/update-on-open where appropriate.
 
-A figure caption should use:
-
-- a dedicated caption paragraph style;
-- a native `SEQ` field or equivalent Word field for the sequence;
-- chapter-aware numbering when the template requires it;
-- editable caption text after the generated number.
-
-Example rendered result:
-
-`图1-1 系统总体架构`
-
-`图1-1` must not be a fixed typed string when automatic numbering is required.
-
-Figure and table counters must be independent.
-
-## 5. Table captions
-
-Use a dedicated table-caption style and an independent native sequence field.
-
-Example:
-
-`表2-3 模型性能对比`
-
-Preserve continuation-table behavior from the template when present.
-
-## 6. Caption labels
-
-Use the labels required by the active template/profile, for example:
-
-- `图`
-- `表`
-- `式`
-- `Figure`
-- `Table`
-
-Do not hard-code Chinese labels globally; the active template decides them.
-
-When the template expects the labels to appear in Word/WPS **Insert Caption** behavior, register them as native caption definitions in `word/settings.xml` (`w:captions` / `w:caption`) in addition to using the corresponding `SEQ` fields. A visual prefix plus `SEQ` alone is not enough when reusable caption-label metadata is required.
-
-## 7. Formulas
-
-When formulas are numbered, use native Word structures where practical and preserve the template's numbering convention.
-
-Prefer Word equation/OMML objects for editable formulas. If formula numbers use fields, retain those fields.
-
-Do not rasterize equations merely to preserve appearance.
-
-## 8. Cross-references
-
-When automatic references are required, use `REF`, `PAGEREF`, or equivalent native Word cross-reference fields.
-
-Examples:
-
-- `如图2-3所示`
-- `见表4-1`
-- `见第3.2节`
-
-The referenced object should have a stable bookmark/reference target when needed.
-
-For existing typed citations, use stable ASCII bookmark names and clickable `REF ... \\h` fields. Apply the same mechanism to bibliography entries, figures, tables, and numbered equations. Preserve OMML equation content; only repair its number/bookmark/reference structure.
-
-## 9. Table of contents
-
-Use a real Word `TOC` field.
-
-The TOC must derive from real heading/outline styles or the template's configured styles.
-
-Do not manually type page numbers or dot leaders.
-
-## 10. Page numbers
-
-Use native Word page-number fields (`PAGE`, and where appropriate `NUMPAGES`, etc.).
-
-Preserve section-specific numbering formats and restarts.
-
-## 11. Styles
-
-Use reusable Word styles for repeated semantic elements.
-
-Prefer style-based formatting to repeated direct formatting.
-
-Typical roles:
-
-- Heading 1-N
-- body
-- captions
-- notes/sources
-- TOC levels
-- references
-- appendix headings/body
-
-Custom template style names are valid and should be preserved.
-
-## 12. Fields and cached display values
-
-A `.docx` may contain both field instructions and cached visible results.
-
-If the runtime cannot force Microsoft Word to recalculate fields, preserve the valid field code and provide a reasonable cached result where possible.
-
-Do not remove the field simply because updating it is inconvenient.
-
-## 13. Native-structure-first rule
-
-Implementation preference:
+## Native-structure-first order
 
 1. reuse template-native structure;
 2. modify existing styles/numbering/fields;
-3. create missing OOXML structure;
-4. only use static text for features that are genuinely static.
+3. create missing OOXML structures;
+4. use static text only for genuinely static content.

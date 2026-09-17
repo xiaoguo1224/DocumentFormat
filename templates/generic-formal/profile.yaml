@@ -1,60 +1,55 @@
 name: generic-formal
-version: 1
+version: 2
 purpose: 通用正式长文档默认格式；未提供其他格式模板时使用
-
 default_template: true
-
 structure:
   default_order:
-    - chinese_abstract
-    - english_abstract
-    - table_of_contents
-    - body
-    - references
-    - acknowledgements
-    - appendices
+  - chinese_abstract
+  - english_abstract
+  - table_of_contents
+  - body
+  - references
+  - acknowledgements
+  - appendices
   cover_required: false
   fixed_header_required: false
-
 styles:
-  chinese_abstract_title: "Abstract Title CN"
-  chinese_abstract_body: "Abstract Body CN"
-  chinese_keywords: "Keywords CN"
-  english_abstract_title: "Abstract Title EN"
-  english_abstract_body: "Abstract Body EN"
-  english_keywords: "Keywords EN"
-  toc_title: "TOC Title"
-  toc_1: "TOC 1"
-  toc_2: "TOC 2"
-  toc_3: "TOC 3"
-  heading_1: "Heading 1"
-  heading_2: "Heading 2"
-  heading_3: "Heading 3"
-  heading_4: "Heading 4"
-  body: "Body Text Generic"
-  special_heading_1: "Special Heading 1"
-  figure_caption: "Figure Caption"
-  table_caption: "Table Caption"
-  figure_note: "Figure Note"
-  table_note: "Table Note"
-  references: "References"
-  appendix_heading: "Appendix Heading"
-  appendix_body: "Appendix Body"
-  equation: "Equation"
-
+  chinese_abstract_title: Abstract Title CN
+  chinese_abstract_body: Abstract Body CN
+  chinese_keywords: Keywords CN
+  english_abstract_title: Abstract Title EN
+  english_abstract_body: Abstract Body EN
+  english_keywords: Keywords EN
+  toc_title: TOC Title
+  toc_1: TOC 1
+  toc_2: TOC 2
+  toc_3: TOC 3
+  heading_1: Heading 1
+  heading_2: Heading 2
+  heading_3: Heading 3
+  heading_4: Heading 4
+  body: Body Text Generic
+  special_heading_1: Special Heading 1
+  figure_caption: Figure Caption
+  table_caption: Table Caption
+  figure_note: Figure Note
+  table_note: Table Note
+  references: References
+  appendix_heading: Appendix Heading
+  appendix_body: Appendix Body
+  equation: Equation
 headings:
   max_level: 4
   numbering:
-    level_1: "1"
-    level_2: "1.1"
-    level_3: "1.1.1"
-    level_4: "1.1.1.1"
+    level_1: '1'
+    level_2: '1.1'
+    level_3: 1.1.1
+    level_4: 1.1.1.1
     native_multilevel_list_required: true
     restart_lower_levels: true
   chapter_starts_new_page: true
   use_page_break_before: true
   numbering_text_must_not_be_typed_manually: true
-
 pagination:
   front_matter:
     format: upperRoman
@@ -65,7 +60,6 @@ pagination:
     start: 1
   position: bottom_center
   page_field_required: true
-
 contents:
   enabled: true
   native_toc_field_required: true
@@ -74,78 +68,82 @@ contents:
   page_numbers_right_aligned: true
   dot_leaders: true
   refresh_after_structure_changes: true
-
 abstracts:
   chinese:
-    title_text: "摘  要"
-    keyword_label: "关键词："
-    keyword_separator: "；"
+    title_text: 摘  要
+    keyword_label: 关键词：
+    keyword_separator: ；
     max_keywords: 5
     punctuation_after_last_keyword: false
   english:
-    title_text: "Abstract"
-    keyword_label: "Key words:"
-    keyword_separator: ";"
+    title_text: Abstract
+    keyword_label: 'Key words:'
+    keyword_separator: ;
     punctuation_after_last_keyword: false
     half_width_space_after_punctuation: true
-
 captions:
   native_seq_fields_required: true
   figure:
-    label: "图"
+    label: 图
     position: below
     include_chapter_number: true
     chapter_heading_level: 1
-    separator: "-"
+    separator: '-'
     punctuation_at_end: false
   table:
-    label: "表"
+    label: 表
     position: above
     include_chapter_number: true
     chapter_heading_level: 1
-    separator: "-"
+    separator: '-'
     punctuation_at_end: false
     table_style: three_line
-    continued_table_prefix: "续表"
+    continued_table_prefix: 续表
     repeat_header_on_continued_pages: true
   subfigures:
-    labels: ["(a)", "(b)", "(c)"]
+    labels:
+    - (a)
+    - (b)
+    - (c)
     subfigure_name_below_each: true
     main_caption_below_all_subfigures: true
   cross_references:
     native_ref_fields_preferred: true
-
 formulas:
   use_equation_editor: true
   pasted_formula_images_forbidden: true
   number_when_multiple: true
   include_chapter_number: true
-  separator: "-"
-  display: centered
-  number_alignment: right
-  line_spacing: single
-
+  separator: '-'
+  label: 式
+  chapter_heading_level: 1
+  reference_labels:
+  - 式
+  - 公式
 references:
   start_new_page: true
-  line_spacing: 1.5
-  hanging_indent_by_index_width:
-    "1-9": "0.6 cm"
-    "10-99": "0.74 cm"
-    "100+": "0.9 cm"
-
+  numbering:
+    native_list_required: true
+    format: '[%1]'
+    suffix: tab
+    tab_position_twips: 720
+    left_indent_twips: 720
+    hanging_twips: 720
+  body_cross_reference:
+    native_ref_required: true
+    paragraph_number_switch: \n
+    hyperlink: true
 acknowledgements:
-  title_text: "致  谢"
+  title_text: 致  谢
   start_new_page: true
-
 appendices:
   start_new_page: true
   labels: uppercase_letters
-  heading_pattern: "附录A"
-  figure_number_example: "图A1"
-  table_number_example: "表B2"
-  formula_number_example: "式(B3)"
+  heading_pattern: 附录A
+  figure_number_example: 图A1
+  table_number_example: 表B2
+  formula_number_example: 式(B3)
   numbering_independent_from_body: true
-
 validation:
   require_native_heading_numbering: true
   require_page_break_before_for_chapter_heading: true
@@ -153,3 +151,26 @@ validation:
   require_toc_field: true
   require_page_field: true
   reject_visual_only_imitation: true
+  require_native_reference_numbering: true
+  require_native_reference_crossrefs: true
+sections:
+  titles:
+    chinese_abstract:
+    - 摘要
+    - 中文摘要
+    - 摘  要
+    english_abstract:
+    - Abstract
+    toc:
+    - 目录
+    - Contents
+    references:
+    - 参考文献
+    - References
+    acknowledgements:
+    - 致谢
+    - 致  谢
+    - Acknowledgements
+    appendices:
+    - 附录
+    - Appendix

@@ -1,175 +1,72 @@
 #!/usr/bin/env python3
-"""Inspect Word-native structures in a .docx/.dotx template.
-
-This reports structure rather than trying to infer every visual rule.
-"""
-
+"""Inspect native Word structure plus reusable visual style/section metadata."""
 from __future__ import annotations
-
-import argparse
-import json
-import sys
-import zipfile
+import argparse,json,sys,zipfile
 from collections import Counter
 from pathlib import Path
 from xml.etree import ElementTree as ET
+W='{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
 
-W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+def x(z,n):
+    try:return ET.fromstring(z.read(n))
+    except KeyError:return None
 
+def a(el,k='val'):return el.get(W+k) if el is not None else None
 
-def xml_from_zip(zf: zipfile.ZipFile, name: str):
-    try:
-        return ET.fromstring(zf.read(name))
-    except KeyError:
-        return None
+def on(el):
+    if el is None:return False
+    v=a(el);return v is None or str(v).lower() not in {'0','false','off','no'}
 
+def style_payload(st):
+    ppr=st.find(W+'pPr');rpr=st.find(W+'rPr');num_id=ilvl=None
+    if ppr is not None:
+        np=ppr.find(W+'numPr')
+        if np is not None:num_id=a(np.find(W+'numId'));ilvl=a(np.find(W+'ilvl'))
+    fonts=rpr.find(W+'rFonts') if rpr is not None else None
+    spacing=ppr.find(W+'spacing') if ppr is not None else None
+    ind=ppr.find(W+'ind') if ppr is not None else None
+    return {
+      'style_id':a(st,'styleId'),'name':a(st.find(W+'name')),'type':a(st,'type'),'based_on':a(st.find(W+'basedOn')),
+      'outline_level':a(ppr.find(W+'outlineLvl')) if ppr is not None else None,'page_break_before':on(ppr.find(W+'pageBreakBefore')) if ppr is not None else False,
+      'keep_with_next':on(ppr.find(W+'keepNext')) if ppr is not None else False,'keep_together':on(ppr.find(W+'keepLines')) if ppr is not None else False,
+      'num_id':num_id,'num_level':ilvl,
+      'paragraph':{'alignment':a(ppr.find(W+'jc')) if ppr is not None else None,'before':a(spacing,'before'),'after':a(spacing,'after'),'line':a(spacing,'line'),'line_rule':a(spacing,'lineRule'),'left':a(ind,'left'),'right':a(ind,'right'),'first_line':a(ind,'firstLine'),'hanging':a(ind,'hanging')},
+      'run':{'ascii_font':a(fonts,'ascii'),'east_asia_font':a(fonts,'eastAsia'),'hansi_font':a(fonts,'hAnsi'),'size_half_points':a(rpr.find(W+'sz')) if rpr is not None else None,'bold':on(rpr.find(W+'b')) if rpr is not None else False,'italic':on(rpr.find(W+'i')) if rpr is not None else False}
+    }
 
-def attr(el, name):
-    return el.get(W + name) if el is not None else None
-
-
-def onoff(el):
-    if el is None:
-        return False
-    v = attr(el, "val")
-    return v is None or str(v).lower() not in {"0", "false", "off", "no"}
-
-
-def inspect(path: Path) -> dict:
-    with zipfile.ZipFile(path) as zf:
-        styles = xml_from_zip(zf, "word/styles.xml")
-        numbering = xml_from_zip(zf, "word/numbering.xml")
-        document = xml_from_zip(zf, "word/document.xml")
-
-        settings = xml_from_zip(zf, "word/settings.xml")
-        result = {
-            "file": str(path),
-            "has_styles_xml": styles is not None,
-            "has_numbering_xml": numbering is not None,
-            "styles": [],
-            "numbering": {},
-            "caption_labels": [],
-            "document": {},
-            "headers": sorted([n for n in zf.namelist() if n.startswith("word/header") and n.endswith(".xml")]),
-            "footers": sorted([n for n in zf.namelist() if n.startswith("word/footer") and n.endswith(".xml")]),
-        }
-
-        if styles is not None:
-            for st in styles.findall(W + "style"):
-                style_id = attr(st, "styleId")
-                typ = attr(st, "type")
-                name_el = st.find(W + "name")
-                based = st.find(W + "basedOn")
-                ppr = st.find(W + "pPr")
-                outline = ppr.find(W + "outlineLvl") if ppr is not None else None
-                page_break = ppr.find(W + "pageBreakBefore") if ppr is not None else None
-                num_id = None
-                ilvl = None
-                if ppr is not None:
-                    numpr = ppr.find(W + "numPr")
-                    if numpr is not None:
-                        n = numpr.find(W + "numId")
-                        l = numpr.find(W + "ilvl")
-                        num_id = attr(n, "val")
-                        ilvl = attr(l, "val")
-                result["styles"].append({
-                    "style_id": style_id,
-                    "name": attr(name_el, "val"),
-                    "type": typ,
-                    "based_on": attr(based, "val"),
-                    "outline_level": attr(outline, "val"),
-                    "page_break_before": onoff(page_break),
-                    "num_id": num_id,
-                    "num_level": ilvl,
-                })
-
+def inspect(path:Path):
+    with zipfile.ZipFile(path) as z:
+        styles=x(z,'word/styles.xml');numbering=x(z,'word/numbering.xml');doc=x(z,'word/document.xml');settings=x(z,'word/settings.xml')
+        result={'file':str(path),'styles':[],'numbering':{'multilevel':[]},'caption_labels':[],'document':{},'sections':[],'headers':sorted(n for n in z.namelist() if n.startswith('word/header') and n.endswith('.xml')),'footers':sorted(n for n in z.namelist() if n.startswith('word/footer') and n.endswith('.xml'))}
+        if styles is not None:result['styles']=[style_payload(st) for st in styles.findall(W+'style')]
         if numbering is not None:
-            abs_nums = numbering.findall(W + "abstractNum")
-            nums = numbering.findall(W + "num")
-            result["numbering"] = {
-                "abstract_num_count": len(abs_nums),
-                "num_count": len(nums),
-                "multilevel": [],
-            }
-            for a in abs_nums:
-                levels = []
-                for lvl in a.findall(W + "lvl"):
-                    ilvl = attr(lvl, "ilvl")
-                    num_fmt = attr(lvl.find(W + "numFmt"), "val")
-                    lvl_text = attr(lvl.find(W + "lvlText"), "val")
-                    pstyle = attr(lvl.find(W + "pStyle"), "val")
-                    levels.append({"level": ilvl, "format": num_fmt, "text": lvl_text, "pstyle": pstyle})
-                result["numbering"]["multilevel"].append({
-                    "abstract_num_id": attr(a, "abstractNumId"),
-                    "levels": levels,
-                })
-
+            for ab in numbering.findall(W+'abstractNum'):
+                levels=[]
+                for lvl in ab.findall(W+'lvl'):
+                    levels.append({'level':a(lvl,'ilvl'),'start':a(lvl.find(W+'start')),'format':a(lvl.find(W+'numFmt')),'text':a(lvl.find(W+'lvlText')),'suffix':a(lvl.find(W+'suff')),'pstyle':a(lvl.find(W+'pStyle'))})
+                result['numbering']['multilevel'].append({'abstract_num_id':a(ab,'abstractNumId'),'levels':levels})
+            result['numbering']['num_count']=len(numbering.findall(W+'num'))
         if settings is not None:
-            caps = settings.find(W + "captions")
+            caps=settings.find(W+'captions')
             if caps is not None:
-                for cap in caps.findall(W + "caption"):
-                    result["caption_labels"].append({
-                        "name": attr(cap, "name"),
-                        "position": attr(cap, "pos"),
-                        "chapter_number": attr(cap, "chapNum"),
-                        "heading_level": attr(cap, "heading"),
-                        "number_format": attr(cap, "numFmt"),
-                    })
-
-        if document is not None:
-            style_usage = Counter()
-            fields = Counter()
-            page_break_before_count = 0
-            numpr_count = 0
-            paragraphs = 0
-            for p in document.iter(W + "p"):
-                paragraphs += 1
-                ppr = p.find(W + "pPr")
+                for c in caps.findall(W+'caption'):result['caption_labels'].append({'name':a(c,'name'),'position':a(c,'pos'),'chapter_number':a(c,'chapNum'),'heading_level':a(c,'heading'),'number_format':a(c,'numFmt')})
+        if doc is not None:
+            usage=Counter();fields=Counter();paras=0
+            for p in doc.iter(W+'p'):
+                paras+=1;ppr=p.find(W+'pPr')
                 if ppr is not None:
-                    ps = ppr.find(W + "pStyle")
-                    if ps is not None:
-                        style_usage[attr(ps, "val")] += 1
-                    if onoff(ppr.find(W + "pageBreakBefore")):
-                        page_break_before_count += 1
-                    if ppr.find(W + "numPr") is not None:
-                        numpr_count += 1
-                for instr in p.iter(W + "instrText"):
-                    text = (instr.text or "").strip()
-                    if text:
-                        head = text.split()[0].upper()
-                        fields[head] += 1
-            # Include fields from headers/footers too.
-            for name in zf.namelist():
-                if (name.startswith("word/header") or name.startswith("word/footer")) and name.endswith(".xml"):
-                    root = xml_from_zip(zf, name)
-                    if root is None:
-                        continue
-                    for instr in root.iter(W + "instrText"):
-                        text = (instr.text or "").strip()
-                        if text:
-                            fields[text.split()[0].upper()] += 1
-            result["document"] = {
-                "paragraph_count": paragraphs,
-                "style_usage": dict(style_usage),
-                "field_types": dict(fields),
-                "page_break_before_paragraphs": page_break_before_count,
-                "numbered_paragraphs_direct": numpr_count,
-                "section_count": len(list(document.iter(W + "sectPr"))),
-            }
-
+                    ps=ppr.find(W+'pStyle')
+                    if ps is not None:usage[a(ps)]+=1
+                for instr in p.iter(W+'instrText'):
+                    t=(instr.text or '').strip()
+                    if t:fields[t.split()[0].upper()]+=1
+            for sect in doc.iter(W+'sectPr'):
+                pg=sect.find(W+'pgSz');mar=sect.find(W+'pgMar');pn=sect.find(W+'pgNumType')
+                result['sections'].append({'page_width_twips':a(pg,'w'),'page_height_twips':a(pg,'h'),'orientation':a(pg,'orient'),'margins_twips':{'top':a(mar,'top'),'right':a(mar,'right'),'bottom':a(mar,'bottom'),'left':a(mar,'left'),'header':a(mar,'header'),'footer':a(mar,'footer')},'page_number':{'format':a(pn,'fmt'),'start':a(pn,'start')}})
+            result['document']={'paragraph_count':paras,'style_usage':dict(usage),'field_types':dict(fields),'section_count':len(result['sections'])}
         return result
 
-
 def main():
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
-    ap = argparse.ArgumentParser()
-    ap.add_argument("docx", type=Path)
-    ap.add_argument("--json", action="store_true")
-    args = ap.parse_args()
-    data = inspect(args.docx)
-    print(json.dumps(data, ensure_ascii=False, indent=2))
-
-
-if __name__ == "__main__":
-    main()
+    if hasattr(sys.stdout,'reconfigure'):sys.stdout.reconfigure(encoding='utf-8')
+    ap=argparse.ArgumentParser();ap.add_argument('docx',type=Path);args=ap.parse_args();print(json.dumps(inspect(args.docx),ensure_ascii=False,indent=2))
+if __name__=='__main__':main()

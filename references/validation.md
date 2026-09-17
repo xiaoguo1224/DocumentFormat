@@ -1,99 +1,38 @@
 # DOCX Validation
 
-Validation must cover both visual appearance and Word-native structure.
+Validation covers both rendered appearance and Word-native structure. The active profile defines semantic style names, caption labels, heading depth, bibliography numbering grammar, and other template-specific expectations; the validator must not hard-code the generic template's names.
 
-## 1. Required structural checks
+## Structural checks
 
-### Styles
+Check semantic styles, heading outline levels, multilevel numbering, body-list numbering, `pageBreakBefore`, caption `SEQ` fields/registered labels, TOC, PAGE fields, section behavior, bookmarks, and `REF`/`PAGEREF` target integrity.
 
-Confirm:
+### Bibliography-specific checks
 
-- expected semantic styles exist;
-- heading paragraphs actually use heading/outline styles;
-- repeated body/caption/reference elements use reusable styles rather than only direct formatting.
+When numeric bibliography numbering is required:
 
-### Numbering
+- the profile's reference style exists;
+- it is bound to a native numbered-list `numId`/level;
+- the resolved level text matches the profile (generic default `[%1]`);
+- the resolved level suffix is `tab`;
+- bibliography paragraph text does not still contain manually typed numbering prefixes;
+- bibliography entries have stable reference bookmarks;
+- body bibliography citations are native `REF` fields;
+- bibliography `REF` fields use the paragraph-number switch (`\\n`) and hyperlink switch when required;
+- every bibliography REF target bookmark exists;
+- recognizable typed body citations fail strict validation when native cross-references are required.
 
-Confirm:
+## Visual checks
 
-- `word/numbering.xml` exists when numbering is required;
-- multilevel definitions exist for numbered headings;
-- heading levels are linked to the appropriate numbering levels;
-- body lists use appropriate numbering definitions;
-- heading numbers are not merely typed into text.
+Render the document and inspect all pages (a contact sheet is acceptable for first pass). Check page geometry, typography, indentation/spacing, orphaned headings, captions, tables, TOC, headers/footers/page numbers, and section starts.
 
-### Pagination
+## Failure conditions
 
-Confirm required chapter-level headings use `pageBreakBefore` when that is the template's behavior.
+Treat required native features as FAIL when replaced by visual imitation, including typed heading numbers, typed figure/table numbers, manually typed bibliography `[1]`, manually typed TOC/page numbers, blank paragraphs used for chapter starts, manual list prefixes, or copied citation numbers that will not update.
 
-Do not accept blank paragraphs as an equivalent implementation.
+## Result levels
 
-### Captions
-
-Confirm:
-
-- figure/table caption paragraphs use caption styles or template-equivalent styles;
-- automatic captions contain `SEQ` fields or equivalent native fields;
-- figure and table counters are independent;
-- chapter-aware numbering is implemented when required;
-- when reusable Word/WPS caption labels are required, `word/settings.xml` registers the expected labels (for the generic template: `图`, `表`, and `式`).
-
-### TOC
-
-Confirm a real `TOC` field exists when a TOC is required.
-
-Confirm source headings are structurally valid.
-
-### Cross-references
-
-When automatic cross-references are required, confirm `REF` / `PAGEREF` or equivalent fields exist.
-
-Also confirm every `REF` target bookmark exists and scan ordinary body paragraphs for recognizable typed citations (`[n]`, `图x-y`, `表x-y`, `式x-y`). Do not count TOC `PAGEREF` fields as proof that body cross-references are native.
-
-### Page numbers
-
-Confirm footer/header page numbering uses Word fields rather than typed digits.
-
-### Section behavior
-
-Confirm section breaks are used only where section-level formatting requires them.
-
-Check page-number restarts, orientation, margins, and header/footer linking where relevant.
-
-## 2. Visual checks
-
-For speed, inspect all rendered pages first on a labeled contact sheet. Full-size inspection is required only for pages whose text, tables, figures, breaks, or margins cannot be judged reliably from the sheet.
-
-Render or inspect the document for:
-
-- margins and page size;
-- heading typography and spacing;
-- body typography, indentation, and line spacing;
-- orphaned headings;
-- figure/table placement;
-- caption spacing;
-- table borders and repeated header rows;
-- TOC layout;
-- headers, footers, and page-number position;
-- section-start behavior.
-
-## 3. Failure conditions
-
-Treat the document as structurally non-compliant if any required native feature was replaced by a visual imitation, including:
-
-- typed heading numbers instead of multilevel numbering;
-- typed figure/table numbers instead of fields;
-- manually typed TOC;
-- typed page numbers;
-- blank paragraphs used to force chapter pagination;
-- manual list prefixes instead of Word lists when editable lists are required.
-
-## 4. Validation result
-
-A useful validator should report:
-
-- PASS: native feature exists and appears correctly configured;
-- WARN: structure exists but cannot be fully verified automatically;
-- FAIL: required native structure is missing or replaced by static text.
+- PASS: native feature exists and matches the active profile/template.
+- WARN: structure exists but cannot be fully verified automatically, or an optional feature is absent.
+- FAIL: required native structure is missing, malformed, has unresolved targets, or was replaced by static text.
 
 Do not claim full compliance when only visual checks were performed.
