@@ -1,19 +1,23 @@
-param([string]$Repo = ".")
-$ErrorActionPreference = "Stop"
-$overlay = Split-Path -Parent $MyInvocation.MyCommand.Path
-$files = @(
-  "SKILL.md", ".gitignore", "pyproject.toml",
-  "references/template-contract.md", "references/validation.md", "references/word-native-structures.md",
-  "scripts/profile_config.py", "scripts/fast_format_docx.py", "scripts/inspect_docx.py", "scripts/repair_cross_references.py", "scripts/validate_docx.py",
-  "templates/generic-formal/profile.yaml", "tests/test_formatter.py"
+param(
+    [Parameter(Mandatory=$true)][string]$Repo
 )
-foreach ($f in $files) {
-  $src = Join-Path $overlay $f
-  $dst = Join-Path $Repo $f
-  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
-  Copy-Item -Force $src $dst
+$ErrorActionPreference = "Stop"
+$Here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Repo = (Resolve-Path $Repo).Path
+$dirs = @("scripts", "tests", "references")
+foreach ($dir in $dirs) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $Repo $dir) | Out-Null
+    Copy-Item -Force -Recurse (Join-Path $Here "$dir\*") (Join-Path $Repo $dir)
 }
-Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $Repo ".idea")
-Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Repo "templates/generic-formal/template.docx.bak")
-Write-Host "Applied DocumentFormat fixes to $Repo"
-Write-Host "Run: python -m pip install -e '.[test]' ; pytest -q"
+$obsolete = @(
+    "PATCH_NOTES.md",
+    "apply_fix.ps1",
+    "apply_fix.sh",
+    "templates\generic-formal\template.docx.bak"
+)
+foreach ($item in $obsolete) {
+    $path = Join-Path $Repo $item
+    if (Test-Path $path) { Remove-Item -Force -Recurse $path }
+}
+Write-Host "Applied DocumentFormat template-runtime repair to $Repo"
+Write-Host "Next: python -m pip install -e '.[test]'; pytest -q"

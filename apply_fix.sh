@@ -1,18 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-repo="${1:-.}"
-overlay="$(cd "$(dirname "$0")" && pwd)"
-files=(
-  SKILL.md .gitignore pyproject.toml
-  references/template-contract.md references/validation.md references/word-native-structures.md
-  scripts/profile_config.py scripts/fast_format_docx.py scripts/inspect_docx.py scripts/repair_cross_references.py scripts/validate_docx.py
-  templates/generic-formal/profile.yaml tests/test_formatter.py
-)
-for f in "${files[@]}"; do
-  mkdir -p "$repo/$(dirname "$f")"
-  cp -f "$overlay/$f" "$repo/$f"
-done
-rm -rf "$repo/.idea"
-rm -f "$repo/templates/generic-formal/template.docx.bak"
-echo "Applied DocumentFormat fixes to $repo"
-echo "Run: python -m pip install -e '.[test]' && pytest -q"
+if [[ $# -ne 1 ]]; then echo "usage: $0 /path/to/DocumentFormat" >&2; exit 2; fi
+HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$1" && pwd)"
+mkdir -p "$REPO/scripts" "$REPO/tests" "$REPO/references"
+cp -f "$HERE"/scripts/* "$REPO/scripts/"
+cp -f "$HERE"/tests/* "$REPO/tests/"
+cp -f "$HERE"/references/* "$REPO/references/"
+rm -rf "$REPO/PATCH_NOTES.md" "$REPO/apply_fix.ps1" "$REPO/apply_fix.sh" "$REPO/templates/generic-formal/template.docx.bak"
+echo "Applied DocumentFormat template-runtime repair to $REPO"
+echo "Next: python -m pip install -e '.[test]'; pytest -q"

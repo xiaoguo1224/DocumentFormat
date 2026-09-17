@@ -1,31 +1,36 @@
-# DocumentFormat fix overlay
+# DocumentFormat template-runtime repair
 
-Base reviewed: `xiaoguo1224/DocumentFormat` master at `d8dcd301023dd38dd52a0f416f943e4a86e9602b`.
+Base reviewed: `master` at `e5c779a0998c55c4f174a6187103ea4cd7dd451b`.
 
 ## Fixes
 
-- Bibliography entries are normalized to native Word list numbering: `[%1]` + real TAB suffix.
-- Manually typed `[1]`, `[2]`, `1.`, `1、` prefixes are removed once native numbering is installed.
-- Every bibliography entry receives a stable `_FmtRefNNNN` bookmark.
-- Body citations become `REF _FmtRefNNNN \\n \\h` fields, so citations reference the paragraph number rather than bibliography paragraph text.
-- Reference repair is idempotent for existing bibliography bookmarks/native REF fields.
-- Reference-section state now exits correctly at acknowledgements/appendices; later body text no longer inherits `References` style.
-- Appendix body detection no longer mistakes ordinary appendix body text for an appendix heading.
-- Formatter and validator are driven by `profile.yaml` semantic mappings instead of hard-coded generic style names/caption labels.
-- Added safe template section geometry transfer (page size/margins/columns/page-number settings; header/footer relationship ids are not blindly copied).
-- Inspector now reports reusable visual style metadata and section/page geometry in addition to native structures.
-- Cross-reference repair keeps the existing formula-number repair path and skips destructive rewriting of complex paragraphs.
-- Added `.gitignore`, dependency metadata, and regression tests.
+- Custom templates can infer semantic heading/body/reference style mappings when no profile is supplied.
+- Source headings are recognized by Word outline level, not only `Heading N` / `标题N` style names.
+- One-section source documents can be split into front matter + body at the first body Heading 1 when page-number formats differ.
+- Section mapping selects template sections by front/body page-number format instead of applying the last template section everywhere.
+- Page size/margins/columns/doc-grid/page-number restart/first-page behavior are transferred from the matching template section.
+- Default, first-page, and even-page headers/footers are cloned with valid package relationships; relationship-backed images/hyperlinks are preserved.
+- A deliberately blank target header/footer clears source leftovers.
+- `evenAndOddHeaders` / `mirrorMargins` settings are preserved.
+- Caption alignment is inherited from the active template caption style; formatter code no longer forces center alignment.
+- PAGE field synthesis is controlled by `pagination.position` and does not force bottom-center.
+- Table first-row repetition is controlled by the profile; table-cell paragraphs are no longer globally overwritten with body style.
+- Custom-template inference detects TOC/PAGE presence, PAGE location, section page-number formats, caption labels, heading page-break-before, and native/visual numeric bibliography evidence.
+- Native bibliography numbering is only enforced when the active template/profile requires it; visual `[1]` reference samples can be upgraded to native numbering automatically.
+- Validator accepts `--template`, uses inferred semantics, checks front/body page-number formats and template header/footer presence.
 
-## Regression tests
+## Verification
 
-`pytest -q` -> `6 passed`.
+- `pytest -q tests/test_template_runtime.py` -> `9 passed`
+- `python -m py_compile scripts/*.py` -> PASS
+- Full custom-template/no-profile pipeline -> PASS, including native bibliography `REF ... \\n \\h`
+- Header image relationship cloning -> PASS
 
-Covered: native bibliography numbering, paragraph-number REF switch, section-state exit, repair idempotency, custom template/profile style mappings, and template page geometry transfer.
+## Repository cleanup included by apply scripts
 
-## Repository cleanup
+The apply scripts remove old one-time patch artifacts if still tracked:
 
-After applying this overlay, remove tracked IDE/backup artifacts if present:
-
-- `.idea/`
+- `PATCH_NOTES.md`
+- `apply_fix.ps1`
+- `apply_fix.sh`
 - `templates/generic-formal/template.docx.bak`

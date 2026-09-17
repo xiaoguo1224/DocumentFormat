@@ -67,10 +67,7 @@ def next_numeric_attr(nodes, attr_name: str) -> int:
 
 
 def ensure_reference_numbering(styles_root, numbering_root, profile) -> tuple[str, str]:
-    """Ensure reference style uses a native list ``[1]`` + TAB.
-
-    Returns ``(style_id, num_id)``.
-    """
+    """Ensure reference style uses a native list ``[1]`` + TAB."""
     if styles_root is None or numbering_root is None:
         raise RuntimeError('styles.xml and numbering.xml are required for native reference numbering')
 
@@ -89,7 +86,6 @@ def ensure_reference_numbering(styles_root, numbering_root, profile) -> tuple[st
     left = int(get(profile, 'references', 'numbering', 'left_indent_twips', default=720))
     hanging = int(get(profile, 'references', 'numbering', 'hanging_twips', default=720))
 
-    # Reuse an existing correctly configured numId when possible.
     current_num = st.xpath('./w:pPr/w:numPr/w:numId/@w:val', namespaces=NS)
     if current_num:
         num_id = current_num[0]
@@ -160,7 +156,8 @@ def clone_rpr(src):
 
 def text_run(text: str, rpr=None):
     r = etree.Element(qn('w:r'))
-    if rpr is not None: r.append(clone_rpr(rpr))
+    if rpr is not None:
+        r.append(clone_rpr(rpr))
     t = etree.SubElement(r, qn('w:t'))
     if text[:1].isspace() or text[-1:].isspace():
         t.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
@@ -172,10 +169,12 @@ def field_runs(instruction: str, cached: str, rpr=None):
     out = []
     for kind, value in (('begin', None), (None, instruction), ('separate', None), (None, cached), ('end', None)):
         r = etree.Element(qn('w:r'))
-        if rpr is not None: r.append(clone_rpr(rpr))
+        if rpr is not None:
+            r.append(clone_rpr(rpr))
         if kind:
             node = etree.SubElement(r, qn('w:fldChar')); node.set(qn('w:fldCharType'), kind)
-            if kind == 'begin': node.set(qn('w:dirty'), 'true')
+            if kind == 'begin':
+                node.set(qn('w:dirty'), 'true')
         elif value == instruction:
             node = etree.SubElement(r, qn('w:instrText')); node.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve'); node.text = value
         else:
@@ -189,27 +188,26 @@ REFERENCE_PREFIX = re.compile(r'^(?:[\[［【(（]\s*(?P<bracket>\d+)\s*[\]］�
 
 def strip_reference_prefix(paragraph) -> str | None:
     visible = text_of(paragraph)
-    m = REFERENCE_PREFIX.match(visible)
-    if not m:
+    match = REFERENCE_PREFIX.match(visible)
+    if not match:
         return None
     nodes = paragraph.xpath('.//w:t', namespaces=NS)
-    remaining = len(m.group(0))
+    remaining = len(match.group(0))
     for t in nodes:
-        s = t.text or ''
-        if remaining <= 0: break
-        take = min(remaining, len(s))
-        t.text = s[take:]
+        value = t.text or ''
+        if remaining <= 0:
+            break
+        take = min(remaining, len(value))
+        t.text = value[take:]
         remaining -= take
-    return m.group('bracket') or m.group('plain')
+    return match.group('bracket') or match.group('plain')
 
 
 def add_reference_targets(paragraphs, ref_style_id, factory, report):
     mapping = {}
     seq = 0
     for p in paragraphs:
-        if style_id(p) != ref_style_id:
-            continue
-        if not text_of(p).strip():
+        if style_id(p) != ref_style_id or not text_of(p).strip():
             continue
         seq += 1
         typed = strip_reference_prefix(p)
@@ -221,8 +219,7 @@ def add_reference_targets(paragraphs, ref_style_id, factory, report):
         else:
             start, end, bookmark = factory.pair(f'_FmtRef{seq:04d}')
             ppr = p.find(qn('w:pPr'))
-            insert_at = 1 if ppr is not None else 0
-            p.insert(insert_at, start)
+            p.insert(1 if ppr is not None else 0, start)
             p.append(end)
         mapping[str(seq)] = {'bookmark': bookmark, 'mode': 'list'}
         report['targets']['references'] += 1
@@ -230,12 +227,15 @@ def add_reference_targets(paragraphs, ref_style_id, factory, report):
 
 
 def field_range(p):
-    children = list(p); begins=[]; ends=[]
+    children = list(p); begins = []; ends = []
     for i, child in enumerate(children):
-        if child.tag != qn('w:r'): continue
+        if child.tag != qn('w:r'):
+            continue
         vals = child.xpath('./w:fldChar/@w:fldCharType', namespaces=NS)
-        if vals == ['begin']: begins.append(i)
-        elif vals == ['end']: ends.append(i)
+        if vals == ['begin']:
+            begins.append(i)
+        elif vals == ['end']:
+            ends.append(i)
     return (min(begins), max(ends)) if begins and ends else None
 
 
@@ -245,22 +245,25 @@ def add_caption_targets(paragraphs, factory, report, profile):
     mapping = {'figure': {}, 'table': {}, 'equation': {}}
     for p in paragraphs:
         seq = next((f for f in instructions(p) if f.upper().startswith('SEQ ')), '')
-        if not seq: continue
+        if not seq:
+            continue
         parts = seq.split(); label = parts[1] if len(parts) > 1 else ''
-        kind = 'figure' if label == figure_label else 'table' if label == table_label else 'equation' if label in {'式','Equation'} else None
-        if not kind: continue
+        kind = 'figure' if label == figure_label else 'table' if label == table_label else 'equation' if label in {'式', 'Equation'} else None
+        if not kind:
+            continue
         visible = text_of(p).strip()
-        m = re.search(r'(\d+(?:[-－.]\d+)?)', visible)
+        match = re.search(r'(\d+(?:[-－.]\d+)?)', visible)
         span = field_range(p)
-        if not m or span is None:
-            report['unresolved'].append(f'{kind} caption target not recognized: {visible[:80]}'); continue
-        number = m.group(1).replace('－','-').replace('.','-')
-        prefix = {'figure':'Fig','table':'Tbl','equation':'Eq'}[kind]
-        start,end,bm = factory.pair(f'_Fmt{prefix}{len(mapping[kind])+1:04d}')
-        p.insert(span[0], start); p.insert(span[1]+2, end)
-        mapping[kind][number]=bm; report['targets'][kind+'s'] += 1
+        if not match or span is None:
+            report['unresolved'].append(f'{kind} caption target not recognized: {visible[:80]}')
+            continue
+        number = match.group(1).replace('－', '-').replace('.', '-')
+        prefix = {'figure': 'Fig', 'table': 'Tbl', 'equation': 'Eq'}[kind]
+        start, end, bookmark = factory.pair(f'_Fmt{prefix}{len(mapping[kind]) + 1:04d}')
+        p.insert(span[0], start); p.insert(span[1] + 2, end)
+        mapping[kind][number] = bookmark
+        report['targets'][kind + 's'] += 1
     return mapping
-
 
 
 def add_typed_equation_targets(paragraphs, names, factory, mapping, report, profile):
@@ -287,8 +290,7 @@ def add_typed_equation_targets(paragraphs, names, factory, mapping, report, prof
         last.text = re.sub(r'(?:式\s*)?[（(]?\s*\d+(?:[-－.]\d+)?\s*[）)]?\s*$', '', last.text or '')
         rpr = last.getparent().find(qn('w:rPr')) if last.getparent() is not None else None
         start, end, bookmark = factory.pair(f'_FmtEq{len(mapping["equation"]) + 1:04d}')
-        paragraph.append(text_run('（', rpr))
-        paragraph.append(start)
+        paragraph.append(text_run('（', rpr)); paragraph.append(start)
         if match.group(2) is not None:
             chapter_level = int(get(profile, 'formulas', 'chapter_heading_level', default=1))
             for node in field_runs(f' STYLEREF {chapter_level} \\n ', chapter, rpr):
@@ -300,19 +302,20 @@ def add_typed_equation_targets(paragraphs, names, factory, mapping, report, prof
             instruction = f' SEQ {label} \\* ARABIC '
         for node in field_runs(instruction, sequence, rpr):
             paragraph.append(node)
-        paragraph.append(end)
-        paragraph.append(text_run('）', rpr))
+        paragraph.append(end); paragraph.append(text_run('）', rpr))
         mapping['equation'][number] = bookmark
         report['targets']['equations'] += 1
 
+
 def paragraph_rpr(p):
     rprs = p.xpath('.//w:r[w:t]/w:rPr', namespaces=NS)
-    sig = {etree.tostring(x) for x in rprs}
-    return rprs[0] if len(sig) <= 1 and rprs else None
+    signatures = {etree.tostring(x) for x in rprs}
+    return rprs[0] if len(signatures) <= 1 and rprs else None
 
 
 def paragraph_safe_to_rewrite(p):
-    if instructions(p): return False
+    if instructions(p):
+        return False
     forbidden = [
         './/w:hyperlink', './/w:drawing', './/w:pict', './/m:oMath', './/m:oMathPara',
         './/w:bookmarkStart', './/w:bookmarkEnd', './/w:commentRangeStart', './/w:commentRangeEnd',
@@ -357,7 +360,6 @@ def repair_body_references(paragraphs, names, ref_map, target_map, report, profi
         visible = text_of(p)
         existing_instructions = instructions(p)
         if any(x.upper().startswith('REF ') for x in existing_instructions):
-            # Already converted. Cached field results still look like typed citations in text_of().
             continue
         matches = list(token.finditer(visible))
         if not matches:
@@ -374,19 +376,16 @@ def repair_body_references(paragraphs, names, ref_map, target_map, report, profi
             if child is not ppr:
                 p.remove(child)
         cursor = 0
-        for m in matches:
-            if m.start() > cursor:
-                p.append(text_run(visible[cursor:m.start()], rpr))
-            original = m.group(0)
-            if m.group('cites'):
-                nums = re.findall(r'\d+', m.group('cites'))
+        for match in matches:
+            if match.start() > cursor:
+                p.append(text_run(visible[cursor:match.start()], rpr))
+            original = match.group(0)
+            if match.group('cites'):
+                nums = re.findall(r'\d+', match.group('cites'))
                 if any(n not in ref_map for n in nums):
-                    p.append(text_run(original, rpr))
-                    report['unresolved'].append(f'citation target missing: {original}')
+                    p.append(text_run(original, rpr)); report['unresolved'].append(f'citation target missing: {original}')
                 else:
-                    p.append(text_run('[', rpr))
-                    inner = m.group('cites')
-                    inner_cur = 0
+                    p.append(text_run('[', rpr)); inner = match.group('cites'); inner_cur = 0
                     for nm in re.finditer(r'\d+', inner):
                         if nm.start() > inner_cur:
                             p.append(text_run(inner[inner_cur:nm.start()], rpr))
@@ -398,62 +397,82 @@ def repair_body_references(paragraphs, names, ref_map, target_map, report, profi
                         p.append(text_run(inner[inner_cur:], rpr))
                     p.append(text_run(']', rpr))
             else:
-                label = m.group('label')
-                number = m.group('number').replace('－', '-').replace('.', '-')
+                label = match.group('label')
+                number = match.group('number').replace('－', '-').replace('.', '-')
                 kind = 'figure' if label.casefold() in {fig_label, 'figure'} else 'table' if label.casefold() in {tbl_label, 'table'} else 'equation'
-                bm = target_map[kind].get(number)
-                if not bm:
-                    p.append(text_run(original, rpr))
-                    report['unresolved'].append(f'{kind} target missing: {original}')
+                bookmark = target_map[kind].get(number)
+                if not bookmark:
+                    p.append(text_run(original, rpr)); report['unresolved'].append(f'{kind} target missing: {original}')
                 else:
-                    prefix = original[:original.find(m.group('number'))]
-                    p.append(text_run(prefix, rpr))
-                    append_ref(p, bm, m.group('number'), rpr)
+                    prefix = original[:original.find(match.group('number'))]
+                    p.append(text_run(prefix, rpr)); append_ref(p, bookmark, match.group('number'), rpr)
                     report['converted'][kind + 's'] += 1
-            cursor = m.end()
+            cursor = match.end()
         if cursor < len(visible):
             p.append(text_run(visible[cursor:], rpr))
 
 
-def repair(input_path: Path, output_path: Path, strict=False, profile_path: Path | None=None) -> dict:
-    profile=load_profile(profile_path)
+def repair(
+    input_path: Path,
+    output_path: Path,
+    strict: bool = False,
+    profile_path: Path | None = None,
+    template_path: Path | None = None,
+) -> dict:
+    profile = load_profile(profile_path, template_path)
     with zipfile.ZipFile(input_path) as zin:
-        document=etree.fromstring(zin.read('word/document.xml'))
-        styles=etree.fromstring(zin.read('word/styles.xml'))
-        numbering=etree.fromstring(zin.read('word/numbering.xml'))
-        files={i.filename: zin.read(i.filename) for i in zin.infolist()}
-    names,_=style_maps(styles)
-    ref_style_id,_=ensure_reference_numbering(styles,numbering,profile)
-    paragraphs=document.xpath('//w:body//w:p',namespaces=NS)
-    report={'targets':{'references':0,'figures':0,'tables':0,'equations':0},'converted':{'citations':0,'figures':0,'tables':0,'equations':0},'unresolved':[],'ambiguous':[],'warnings':[]}
-    factory=BookmarkFactory(document)
-    ref_map=add_reference_targets(paragraphs,ref_style_id,factory,report)
-    target_map=add_caption_targets(paragraphs,factory,report,profile)
-    add_typed_equation_targets(paragraphs,names,factory,target_map,report,profile)
-    repair_body_references(paragraphs,names,ref_map,target_map,report,profile)
-    files['word/document.xml']=etree.tostring(document,xml_declaration=True,encoding='UTF-8',standalone='yes')
-    files['word/styles.xml']=etree.tostring(styles,xml_declaration=True,encoding='UTF-8',standalone='yes')
-    files['word/numbering.xml']=etree.tostring(numbering,xml_declaration=True,encoding='UTF-8',standalone='yes')
-    target=output_path
-    if input_path.resolve()==output_path.resolve():
-        fd,temp=tempfile.mkstemp(prefix='crossrefs-',suffix='.docx',dir=output_path.parent); os.close(fd); target=Path(temp)
+        document = etree.fromstring(zin.read('word/document.xml'))
+        styles = etree.fromstring(zin.read('word/styles.xml'))
+        numbering = etree.fromstring(zin.read('word/numbering.xml'))
+        files = {info.filename: zin.read(info.filename) for info in zin.infolist()}
+    names, by_name = style_maps(styles)
+    paragraphs = document.xpath('//w:body//w:p', namespaces=NS)
+    report = {
+        'targets': {'references': 0, 'figures': 0, 'tables': 0, 'equations': 0},
+        'converted': {'citations': 0, 'figures': 0, 'tables': 0, 'equations': 0},
+        'unresolved': [], 'ambiguous': [], 'warnings': [],
+    }
+    factory = BookmarkFactory(document)
+    native_reference_numbering = bool(get(profile, 'references', 'numbering', 'native_list_required', default=True))
+    ref_map = {}
+    if native_reference_numbering:
+        ref_style_id, _ = ensure_reference_numbering(styles, numbering, profile)
+        ref_map = add_reference_targets(paragraphs, ref_style_id, factory, report)
+    else:
+        report['warnings'].append('native bibliography numbering disabled by active template/profile')
+    target_map = add_caption_targets(paragraphs, factory, report, profile)
+    add_typed_equation_targets(paragraphs, names, factory, target_map, report, profile)
+    repair_body_references(paragraphs, names, ref_map, target_map, report, profile)
+    files['word/document.xml'] = etree.tostring(document, xml_declaration=True, encoding='UTF-8', standalone='yes')
+    files['word/styles.xml'] = etree.tostring(styles, xml_declaration=True, encoding='UTF-8', standalone='yes')
+    files['word/numbering.xml'] = etree.tostring(numbering, xml_declaration=True, encoding='UTF-8', standalone='yes')
+    target = output_path
+    if input_path.resolve() == output_path.resolve():
+        fd, temp = tempfile.mkstemp(prefix='crossrefs-', suffix='.docx', dir=output_path.parent)
+        os.close(fd); target = Path(temp)
     try:
-        with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as zout:
-            for name,data in files.items(): zout.writestr(name,data)
-        if target!=output_path: target.replace(output_path)
+        with zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED) as zout:
+            for name, data in files.items():
+                zout.writestr(name, data)
+        if target != output_path:
+            target.replace(output_path)
     finally:
-        if target!=output_path and target.exists(): target.unlink()
+        if target != output_path and target.exists():
+            target.unlink()
     if strict and (report['unresolved'] or report['ambiguous']):
-        raise RuntimeError(json.dumps(report,ensure_ascii=False))
+        raise RuntimeError(json.dumps(report, ensure_ascii=False))
     return report
 
 
 def main():
-    if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
-    ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('input',type=Path); ap.add_argument('output',type=Path)
-    ap.add_argument('--profile',type=Path); ap.add_argument('--strict',action='store_true')
-    args=ap.parse_args()
-    print(json.dumps(repair(args.input,args.output,args.strict,args.profile),ensure_ascii=False,indent=2))
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('input', type=Path); ap.add_argument('output', type=Path)
+    ap.add_argument('--profile', type=Path); ap.add_argument('--template', type=Path); ap.add_argument('--strict', action='store_true')
+    args = ap.parse_args()
+    print(json.dumps(repair(args.input, args.output, args.strict, args.profile, args.template), ensure_ascii=False, indent=2))
 
-if __name__=='__main__': main()
+
+if __name__ == '__main__':
+    main()
